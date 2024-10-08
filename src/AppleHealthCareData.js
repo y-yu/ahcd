@@ -10,16 +10,36 @@
 class AppleHealthCareData {
   /**
    * @constructor
-   * @params {string} xml
    * @desc
-   * this.nodes : parse by using elementtree
+   * this.nodes : parse by using sax-parser
    * this.results : {}
    * this.csvs : {}
    */
-  constructor(xml){
-    this.nodes = require('elementtree').parse(xml)._root.getchildren();
+  constructor(){
     this.results = {};
     this.csvs = {};
+
+    this.parser = require('sax').createStream(true);
+    this.parser.on("opentag", (node) => {
+      if ('Record' === node.name && node.attributes['type']) {
+        const match = node.attributes['type'].match(/^HK.*TypeIdentifier(.+)$/);
+        if(!match || 0 === match.length) return;
+        const key = match[1];
+        // initialize this.results[key]
+        if(!this.results[key]){
+          this.results[key] = {header :[] , records:[]};
+          Object
+            .keys(node.attributes)
+            .filter((k) => 'type' !== k)
+            .forEach((k) => this.results[key].header.push({id:k,title:k}));
+        }
+        const record = {};
+        this.results[key].header.forEach((h) => {
+          record[h.id] = node.attributes[h.id];
+        });
+        this.results[key].records.push(record);        
+      }
+    });
   }
   /**
    * analyze
@@ -28,25 +48,15 @@ class AppleHealthCareData {
    * crawl this.nodes to fillout this.results
    *
    */
-  analyze(){
+  async analyze(readStream){
     this.results = {};
-    this.nodes.forEach((node) => {
-      if('Record' === node.tag && node.attrib['type']){
-        // shorten identifier
-        const match = node.attrib['type'].match(/^HK.*TypeIdentifier(.+)$/);
-        if(!match || 0 === match.length) return;
-        const key = match[1];
-        // initialize this.results[key]
-        if(!this.results[key]){
-          this.results[key] = {header :[] , records:[]};
-          Object.keys(node.attrib).filter((k) => 'type' !== k)
-            .forEach((k) => this.results[key].header.push({id:k,title:k}));
-        }
-        const record = {};
-        this.results[key].header.forEach((h) => {
-          record[h.id] = node.attrib[h.id];
-        });
-        this.results[key].records.push(record);
+    readStream.pipe(this.parser);
+    await new Promise(resolve => {
+      if (this.parser.closed) {
+        resolve()
+      } else {
+        readStream.on("finish", resolve);
+        this.parser.on("end", resolve);
       }
     });
     return this;

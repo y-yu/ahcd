@@ -1,8 +1,12 @@
 module.exports = {
   mode: 'production',
   entry: './src/AppleHealthCareData.js',
-  node: {
-    fs: 'empty'
+  resolve: {
+    fallback: {
+      fs: false,
+      stream: false,
+      string_decoder: false,
+    }
   },
   output: {
     library: 'AppleHealthCareData',

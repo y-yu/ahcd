@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+
 const pkg  = require('../package')
 const argv = require('minimist')(process.argv.slice(2));
 
@@ -24,13 +27,15 @@ if (argv['_'].length < 1 || typeof argv['h'] !== 'undefined'){
 const AppleHealthCareData = require('../dist/ahcd');
 console.log(`Read ${argv['_'][0]}`);
 const fs   = require('fs')
-const ahcd = new AppleHealthCareData(fs.readFileSync(argv['_'][0], 'utf8'));
+const ahcd = new AppleHealthCareData();
 
 /*
  read data from xml
  */
 console.log(`Analyze ${argv['_'][0]}`);
-ahcd.analyze().writeCsvs();
+const analyze = await ahcd.analyze(fs.createReadStream(argv['_'][0], 'utf8'));
+console.log('Done analyze!');
+analyze.writeCsvs();
 
 /*
  filter set dir from '-d'
